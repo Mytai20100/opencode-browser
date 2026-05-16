@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Opencode Brower",
+  "version": "0.0.1",
+  "version_name": "opencode beta-1a",
+  "description": "Opencode peak =)",
+  "permissions": [
+    "tabs",
+    "scripting",
+    "activeTab",
+    "storage",
+    "cookies",
+    "history",
+    "bookmarks",
+    "downloads",
+    "notifications",
+    "webNavigation",
+    "contextMenus",
+    "windows",
+    "tabGroups",
+    "debugger",
+    "management",
+    "alarms"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  }
+}

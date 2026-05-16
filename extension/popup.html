@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 280px;
+      padding: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background-color: #0d1117;
+      color: #c9d1d9;
+      font-size: 13px;
+    }
+
+    /* ── HEADER ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-bottom: 14px;
+      border-bottom: 1px solid #21262d;
+      padding-bottom: 10px;
+    }
+    .header img { width: 22px; height: 22px; }
+    .header h3 { font-size: 15px; color: #f0f6fc; flex: 1; }
+    .version-badge {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 10px;
+      padding: 2px 7px;
+      font-size: 10px;
+      color: #8b949e;
+    }
+
+    /* ── STATUS ROW ── */
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #161b22;
+      border: 1px solid #21262d;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-bottom: 14px;
+    }
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #484f58;
+      flex-shrink: 0;
+      transition: background 0.3s, box-shadow 0.3s;
+    }
+    .status-dot.connected {
+      background: #e3863a;
+      box-shadow: 0 0 7px #e3863a;
+    }
+    #status-text {
+      font-size: 12px;
+      color: #8b949e;
+      flex: 1;
+      transition: color 0.3s;
+    }
+    #status-text.connected { color: #e3863a; }
+
+    /* ── TOGGLE SWITCH ── */
+    .toggle-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .toggle-label {
+      font-size: 11px;
+      color: #8b949e;
+    }
+    .toggle {
+      position: relative;
+      width: 38px;
+      height: 20px;
+      flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #c0392b;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+    .slider:before {
+      content: '';
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 3px; top: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+    .toggle input:checked + .slider { background: #e3863a; }
+    .toggle input:checked + .slider:before { transform: translateX(18px); }
+
+    /* ── ENDPOINT ── */
+    .field { margin-bottom: 12px; }
+    label { display: block; font-size: 11px; margin-bottom: 4px; color: #8b949e; }
+    input {
+      width: 100%;
+      background: #010409;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: #f0f6fc;
+      font-size: 12px;
+    }
+    input:focus {
+      outline: none;
+      border-color: #e3863a;
+      box-shadow: 0 0 0 3px rgba(227,134,58,0.2);
+    }
+
+    /* ── SAVE BTN ── */
+    button#save-btn {
+      width: 100%;
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+      margin-bottom: 14px;
+    }
+    button#save-btn:hover { background: #30363d; }
+
+    /* ── FOOTER ── */
+    .footer {
+      font-size: 10px;
+      color: #484f58;
+      text-align: center;
+      border-top: 1px solid #21262d;
+      padding-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <img src="icon.svg" alt="icon">
+    <h3>Opencode Brower</h3>
+    <span class="version-badge">beta-1a</span>
+  </div>
+
+  <div class="status-row">
+    <div id="status-dot" class="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+    <div class="toggle-wrap">
+      <span class="toggle-label" id="toggle-label">OFF</span>
+      <label class="toggle">
+        <input type="checkbox" id="connect-toggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>Server Endpoint</label>
+    <input type="text" id="endpoint" placeholder="ws://localhost:3002" value="ws://localhost:3002">
+  </div>
+  <button id="save-btn">Save Endpoint</button>
+
+  <div class="footer">opencode beta-1a &middot; <span id="ws-url">ws://localhost:3002</span></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

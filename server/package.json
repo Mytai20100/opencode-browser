@@ -1,0 +1,58 @@
+{
+  "name": "@mytai20100/opencode-browser",
+  "version": "1.0.0",
+  "description": "OpenCode Browser MCP — Chrome automation plugin for OpenCode via WebSocket + Chrome Extension. 50+ tools: tabs, CDP debugging, network intercept, visual click, session, accessibility and more.",
+  "main": "dist/index.js",
+  "bin": {
+    "opencode-browser": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm index.ts",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "opencode",
+    "mcp",
+    "browser",
+    "chrome",
+    "automation",
+    "cdp",
+    "devtools",
+    "websocket",
+    "extension",
+    "ai",
+    "agent"
+  ],
+  "author": "mytai20100",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mytai20100/opencode-browser"
+  },
+  "homepage": "https://github.com/mytai20100/opencode-browser#readme",
+  "bugs": {
+    "url": "https://github.com/mytai20100/opencode-browser/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.0"
+  }
+}
