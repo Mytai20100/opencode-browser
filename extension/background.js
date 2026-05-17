@@ -1,6 +1,7 @@
 let socket = null;
 let currentEndpoint = 'ws://localhost:3002';
 let isConnected = false;
+let isEnabled = true;
 let reconnectTimer = null;
 let pingTimer = null;
 
@@ -8,18 +9,21 @@ chrome.alarms.create('keepAlive', { periodInMinutes: 0.3 }); // every 18s
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'keepAlive') {
     // Just waking up the SW is enough; also re-check connection
-    if (!isConnected) {
+    if (isEnabled && !isConnected) {
       clearTimeout(reconnectTimer);
       connect();
     }
   }
 });
 
-chrome.storage.local.get(['endpoint'], (result) => {
+chrome.storage.local.get(['endpoint', 'enabled'], (result) => {
   if (result.endpoint) {
     currentEndpoint = result.endpoint;
   }
-  connect();
+  isEnabled = result.enabled !== false; // default ON
+  if (isEnabled) {
+    connect();
+  }
 });
 
 function connect() {
@@ -1532,10 +1536,12 @@ function connect() {
     }, 20000);
   };
   socket.onclose = () => {
-    console.log('Socket closed, retrying in 3s...');
+    console.log('Socket closed' + (isEnabled ? ', retrying in 3s...' : ', not retrying (disabled).'));
     isConnected = false;
     clearInterval(pingTimer);
-    reconnectTimer = setTimeout(connect, 3000);
+    if (isEnabled) {
+      reconnectTimer = setTimeout(connect, 3000);
+    }
   };
   socket.onerror = (err) => {
     console.error('Socket error:', err);
@@ -1547,10 +1553,12 @@ function connect() {
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'RECONNECT') {
+    isEnabled = true;
     currentEndpoint = message.endpoint;
     connect();
   }
   if (message.type === 'DISCONNECT') {
+    isEnabled = false;
     clearTimeout(reconnectTimer);
     clearInterval(pingTimer);
     if (socket) {

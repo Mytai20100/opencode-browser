@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Opencode Brower",
-  "version": "0.0.1b",
+  "version": "0.0.2a",
   "version_name": "opencode beta-1a",
   "description": "Opencode peak =)",
   "permissions": [
