@@ -54,7 +54,7 @@ Add the server to your OpenCode config (`~/.config/opencode/config.json` or `ope
   "mcp": {
     "browsermcp": {
       "type": "local",
-      "command": ["npx", "-y", "@mytai20100/opencode-browser@0.0.1"],
+      "command": ["opencode-browser"],
       "enabled": true
     }
   }
