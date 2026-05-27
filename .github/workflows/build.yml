@@ -1,18 +1,15 @@
 name: Package npm
-
 on:
   push:
     branches:
       - main
     paths:
       - 'CHANGELOG-MCP.md'
-
 jobs:
   publish:
     name: Build & Publish to npm
     runs-on: ubuntu-latest
     environment: npm-publish
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,14 +29,18 @@ jobs:
           echo "Version: $VERSION"
 
       - name: Check tag does not exist
+        id: check_tag
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           if git ls-remote --tags origin "refs/tags/$TAG" | grep -q "$TAG"; then
             echo "Tag $TAG already exists, skipping publish."
-            exit 0
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Sync version to package.json
+        if: steps.check_tag.outputs.skip == 'false'
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           cd server
@@ -47,26 +48,42 @@ jobs:
           echo "package.json version -> $VERSION"
 
       - name: Setup Node.js
+        if: steps.check_tag.outputs.skip == 'false'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies
+        if: steps.check_tag.outputs.skip == 'false'
         run: npm install
         working-directory: server
 
       - name: Build TypeScript
+        if: steps.check_tag.outputs.skip == 'false'
         run: npm run build
         working-directory: server
 
+      - name: Verify npm auth
+        if: steps.check_tag.outputs.skip == 'false'
+        run: |
+          echo "--- Checking npm identity ---"
+          npm whoami
+          echo "--- Checking access to package ---"
+          npm access list packages 2>/dev/null || echo "(no org packages or permission denied)"
+        working-directory: server
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish to npm
+        if: steps.check_tag.outputs.skip == 'false'
         run: npm publish --access public
         working-directory: server
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN || vars.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create Git tag
+        if: steps.check_tag.outputs.skip == 'false'
         run: |
           TAG="${{ steps.version.outputs.tag }}"
           VERSION="${{ steps.version.outputs.version }}"
@@ -77,6 +94,7 @@ jobs:
           echo "Tagged $TAG"
 
       - name: Extract changelog for this version
+        if: steps.check_tag.outputs.skip == 'false'
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -86,6 +104,7 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
+        if: steps.check_tag.outputs.skip == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
