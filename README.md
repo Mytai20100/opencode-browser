@@ -1,7 +1,7 @@
 # opencode-browser
 
 [![npm version](https://img.shields.io/npm/v/@mytai20100/opencode-browser?label=mcp-server&color=blue)](https://www.npmjs.com/package/@mytai20100/opencode-browser)
-[![extension version](https://img.shields.io/badge/extension-beta--1a-blue)](https://github.com/mytai20100/opencode-browser)
+[![extension version](https://img.shields.io/badge/extension-0.0.5-blue)](https://github.com/mytai20100/opencode-browser)
 [![language](https://img.shields.io/badge/language-JavaScript-yellow)](https://github.com/mytai20100/opencode-browser)
 [![license](https://img.shields.io/badge/license-MIT-green)](./server/LICENSE)
 [![Package npm](https://github.com/Mytai20100/opencode-brower/actions/workflows/build.yml/badge.svg?event=status)](https://github.com/Mytai20100/opencode-brower/actions/workflows/build.yml)
