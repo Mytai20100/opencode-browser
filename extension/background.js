@@ -2196,12 +2196,6 @@ function connect() {
         }
 
 
-        default:
-          throw new Error(`Unknown method: ${method}`);
-      }
-
-      socket.send(JSON.stringify({ id, result }));
-        
         case 'profiling_start': {
           const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
           const tabId = params.tabId || tab.id;
@@ -2455,35 +2449,6 @@ function connect() {
           break;
         }
 
-    } catch (error) {
-      console.error('Command error:', error);
-      socket.send(JSON.stringify({ id, error: error.message }));
-    }
-  };
-
-  socket.onopen = () => {
-    console.log('Connected to server');
-    isConnected = true;
-    // Send ping every 20s to keep the WebSocket alive on both ends
-    clearInterval(pingTimer);
-    pingTimer = setInterval(() => {
-      if (socket && socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: 'ping' }));
-      }
-    }, 20000);
-  };
-  socket.onclose = () => {
-    console.log('Socket closed' + (isEnabled ? ', retrying in 3s...' : ', not retrying (disabled).'));
-    isConnected = false;
-    clearInterval(pingTimer);
-    if (isEnabled) {
-      reconnectTimer = setTimeout(connect, 3000);
-    }
-  };
-  socket.onerror = (err) => {
-    console.error('Socket error:', err);
-    isConnected = false;
-    clearInterval(pingTimer);
         case 'get_indexeddb': {
           const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
           const tabId = params.tabId || tab.id;
@@ -2677,6 +2642,41 @@ function connect() {
           break;
         }
 
+        default:
+          throw new Error(`Unknown method: ${method}`);
+      }
+
+      socket.send(JSON.stringify({ id, result }));
+
+    } catch (error) {
+      console.error('Command error:', error);
+      socket.send(JSON.stringify({ id, error: error.message }));
+    }
+  };
+
+  socket.onopen = () => {
+    console.log('Connected to server');
+    isConnected = true;
+    // Send ping every 20s to keep the WebSocket alive on both ends
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'ping' }));
+      }
+    }, 20000);
+  };
+  socket.onclose = () => {
+    console.log('Socket closed' + (isEnabled ? ', retrying in 3s...' : ', not retrying (disabled).'));
+    isConnected = false;
+    clearInterval(pingTimer);
+    if (isEnabled) {
+      reconnectTimer = setTimeout(connect, 3000);
+    }
+  };
+  socket.onerror = (err) => {
+    console.error('Socket error:', err);
+    isConnected = false;
+    clearInterval(pingTimer);
     // onclose will fire after onerror, so reconnect is handled there
   };
 }
