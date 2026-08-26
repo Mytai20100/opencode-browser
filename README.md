@@ -511,6 +511,9 @@ Contributions are welcome.
 - Plugin issues: [opencode-browser GitHub](https://github.com/mytai20100/opencode-browser)
 - OpenCode issues: [OpenCode GitHub](https://github.com/anomalyco/opencode)
 
+## Contributors
+- [Hcone-Eyne](https://github.com/Hcone-Eyne)
+
 ## Changelog
 
 See [CHANGELOG-MCP.md](CHANGELOG-MCP.md) for a detailed list of changes.
