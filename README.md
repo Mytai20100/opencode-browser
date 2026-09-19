@@ -538,7 +538,7 @@ intent: "capture network requests from the login page"
 
 - Node.js 22 or later
 - Google Chrome (or a Chromium-based browser that supports Manifest V3)
-- OpenCode 1.0 or later
+- OpenCode v1.18.31 or later
 
 ## Troubleshooting
 
@@ -615,7 +615,8 @@ Contributions are welcome.
 ## Changelog
 
 See [CHANGELOG-MCP.md](CHANGELOG-MCP.md) for a detailed list of changes.
-
+## v0.0.7
+  - Fix multi-profile collision: client registry + routing, default 127.0.0.1 for extension . From [3DBarath](https://github.com/3DBarath)
 ### v0.0.6
 
   - Stealth & anti-fingerprinting: stealth_enable, stealth_disable, stealth_status (webdriver, canvas, webgl, audio, fonts, codecs, permissions spoofing)
