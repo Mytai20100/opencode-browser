@@ -361,6 +361,7 @@ These tools require calling `chrome_debug_attach` first.
 | `chrome_get_extension_info` | Get info about the extension itself |
 | `chrome_get_workflow_context` | Snapshot of forms, buttons, inputs, and event log |
 | `chrome_get_tool_graph` | Get optimal tool execution plan for a given intent |
+| `chrome_list_clients` | Get list connected Chrome profiles (extension clients) |
 
 ### CSS & Styling
 
@@ -609,6 +610,7 @@ Contributions are welcome.
 
 ## Contributors
 - [Hcone-Eyne](https://github.com/Hcone-Eyne)
+- [3DBarath](https://github.com/3DBarath)
 
 ## Changelog
 

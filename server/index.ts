@@ -8,12 +8,28 @@ import {
 import { WebSocketServer, WebSocket } from "ws";
 
 const WS_PORT = parseInt(process.env.OPENCODE_BROWSER_PORT || "3002", 10);
+const WS_HOST = process.env.OPENCODE_BROWSER_HOST || "0.0.0.0";
 
 const wss = new WebSocketServer({
   port: WS_PORT,
-  host: "0.0.0.0",
+  host: WS_HOST,
   verifyClient: () => true,
 });
+
+// clientId -> connection meta. Each Chrome profile runs its own extension
+// service worker, so N profiles = N clients on one server.
+const clients = new Map<string, { ws: WebSocket; label: string; version: string; connectedAt: number }>();
+const wsToClient = new Map<WebSocket, string>();
+
+function listClients() {
+  return [...clients.entries()].map(([clientId, m]) => ({
+    clientId,
+    label: m.label,
+    version: m.version,
+    connectedAt: new Date(m.connectedAt).toISOString(),
+    open: m.ws.readyState === WebSocket.OPEN,
+  }));
+}
 
 wss.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {
@@ -21,7 +37,7 @@ wss.on("error", (err: NodeJS.ErrnoException) => {
       `[opencode-browser] Port ${WS_PORT} already in use. ` +
       `Another instance may be running. ` +
       `Set OPENCODE_BROWSER_PORT env var to use a different port, ` +
-      `then update the extension endpoint to match (ws://localhost:<port>).`
+      `then update the extension endpoint to match (ws://127.0.0.1:<port>).`
     );
     // Do NOT exit — MCP stdio transport still works; tools will return
     // "No extension connected" until the port frees up or is changed.
@@ -31,13 +47,12 @@ wss.on("error", (err: NodeJS.ErrnoException) => {
 });
 
 wss.on("listening", () => {
-  console.error(`[opencode-browser] WebSocket server started on port ${WS_PORT}`);
+  console.error(`[opencode-browser] WebSocket server started on ws://${WS_HOST}:${WS_PORT}`);
 });
 
 // Keep connections alive with server-side ping every 25s
 const SERVER_PING_INTERVAL = 25000;
 wss.on("connection", (ws) => {
-  console.error("Extension connected");
   (ws as any).isAlive = true;
 
   ws.on("pong", () => { (ws as any).isAlive = true; });
@@ -46,20 +61,65 @@ wss.on("connection", (ws) => {
       const msg = JSON.parse(data.toString());
       // Ignore keep-alive pings from extension
       if (msg.type === "ping") return;
+      if (msg.type === "hello" && msg.clientId) {
+        const clientId = String(msg.clientId);
+        const previous = clients.get(clientId);
+        // Same clientId reconnected on a new socket:drop the stale mapping and close the old socket so it cant leak or clobber the new entry.
+        if (previous && previous.ws !== ws) {
+          wsToClient.delete(previous.ws);
+          try { previous.ws.terminate(); } catch {}
+        }
+        clients.set(clientId, {
+          ws,
+          label: String(msg.label || ""),
+          version: String(msg.version || ""),
+          connectedAt: Date.now(),
+        });
+        wsToClient.set(ws, clientId);
+        console.error(`Extension connected: ${msg.label || "(unnamed)"} [${clientId.slice(0, 8)}] (${clients.size} total)`);  
+      return;
+      }
     } catch (e) {}
   });
-  ws.on("close", () => { console.error("Extension disconnected"); });
+  ws.on("close", () => {
+    const id = wsToClient.get(ws);
+    if (id) {
+      // Only remove the registry entry if it still points at THIS socket.
+      // A late close from a replaced socket must not evict the new one.
+      if (clients.get(id)?.ws === ws) {
+        clients.delete(id);
+        console.error(`Extension disconnected: [${String(id).slice(0, 8)}] (${clients.size} remaining)`);
+      } else {
+        console.error(`Stale extension socket closed: [${String(id).slice(0, 8)}]`);
+      }
+      wsToClient.delete(ws);
+    } else {
+      console.error("Extension disconnected (unidentified)");
+    }
+  });
 });
 
 // Server-side heartbeat: ping all clients, drop dead ones
 const heartbeat = setInterval(() => {
-  wss.clients.forEach((ws) => {
+  for (const [id, m] of clients) {
+    const ws = m.ws;
     if ((ws as any).isAlive === false) {
-      console.error("Dropping dead connection");
-      return ws.terminate();
+      console.error(`Dropping dead connection: [${String(id).slice(0, 8)}]`);
+      if (clients.get(id)?.ws === ws) {
+        clients.delete(id);
+      }
+      wsToClient.delete(ws);
+      try { ws.terminate(); } catch {}
+      continue;
     }
     (ws as any).isAlive = false;
-    ws.ping();
+    try { ws.ping(); } catch {}
+  }
+  // Also sweep raw sockets that never sent hello
+  wss.clients.forEach((ws) => {
+    if (!wsToClient.has(ws) && (ws as any).isAlive === false) {
+      try { ws.terminate(); } catch {}
+    }
   });
 }, SERVER_PING_INTERVAL);
 
@@ -77,42 +137,74 @@ const server = new Server(
 
 async function callExtension(method: string, params: any) {
   return new Promise((resolve, reject) => {
+    const { clientId, _clientId, target, ...forwardParams } = params || {};
+    const targetId: string | undefined = clientId || _clientId || target;
     const id = Math.random().toString(36).substring(7);
-    const message = JSON.stringify({ id, method, params });
+    const message = JSON.stringify({ id, method, params: forwardParams });
 
-    let sent = false;
-    wss.clients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        sent = true;
-        const listener = (data: any) => {
-          try {
-            const response = JSON.parse(data.toString());
-            // Ignore keep-alive pings
-            if (response.type === "ping") return;
-            if (response.id === id) {
-              client.removeListener("message", listener);
-              if (response.error) reject(new Error(response.error));
-              else resolve(response.result);
-            }
-          } catch (e) {}
-        };
-        client.on("message", listener);
-        client.send(message);
+    const sendTo = (client: WebSocket): boolean => {
+      if (client.readyState !== WebSocket.OPEN) return false;
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        client.removeListener("message", listener);
+        reject(new Error("Timeout waiting for extension response"));
+      }, 30000);
+      const listener = (data: any) => {
+        try {
+          const response = JSON.parse(data.toString());
+          // Ignore keep-alive pings / hellos
+          if (response.type === "ping" || response.type === "hello") return;
+          if (response.id === id) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            client.removeListener("message", listener);
+            if (response.error) reject(new Error(response.error));
+            else resolve(response.result);
+          }
+        } catch (e) {}
+      };
+      client.on("message", listener);
+      client.send(message);
+      return true;
+    };
+
+    if (targetId) {
+      const meta = clients.get(targetId);
+      if (!meta) {
+        const available = listClients().map((c) => `${c.label || "(unnamed)"} [${c.clientId.slice(0, 8)}]`).join(", ") || "none";
+        reject(new Error(`Unknown clientId "${targetId}". Connected: ${available}. Call chrome_list_clients for full IDs.`));
+        return;
       }
-    });
-
-    if (!sent) {
-      reject(new Error(`No Chrome extension connected. Ensure opencode-browser extension is installed and connected to ws://localhost:${WS_PORT} (check the extension popup).`));
+      if (!sendTo(meta.ws)) {
+        reject(new Error(`Extension client "${targetId}" is not connected (socket not open).`));
+      }
       return;
     }
 
-    setTimeout(() => {
-      reject(new Error("Timeout waiting for extension response"));
-    }, 30000);
+    const open = [...clients.values()].filter((m) => m.ws.readyState === WebSocket.OPEN);
+    if (open.length === 0) {
+      reject(new Error(`No Chrome extension connected. Ensure opencode-browser extension is installed and connected to ws://127.0.0.1:${WS_PORT} (check the extension popup).`));
+      return;
+    }
+    if (open.length > 1) {
+      const available = listClients().map((c) => `${c.label || "(unnamed)"} [${c.clientId}]`).join(", ");
+      reject(new Error(`Multiple Chrome profiles connected (${open.length}): ${available}. Pass {"clientId": "<id>"} (see chrome_list_clients) to target one.`));
+      return;
+    }
+    sendTo(open[0].ws);
   });
 }
 
 const TOOLS = [
+  {
+    name: "chrome_list_clients",
+    description:
+      "List connected Chrome profiles (extension clients) with clientId and label. When multiple profiles are connected, pass {\"clientId\": \"<id>\"} to any chrome_* tool to target one.",
+    inputSchema: { type: "object", properties: {} },
+  },
   // TABS VIEWING & QUERYING
   {
     name: "chrome_list_tabs",
@@ -2743,6 +2835,11 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     });
     return { content: [{ type: "text", text: JSON.stringify(summary, null, 2) }] };
+  }
+
+  // Client list: handled server-side, no extension needed
+  if (name === "chrome_list_clients") {
+    return { content: [{ type: "text", text: JSON.stringify(listClients(), null, 2) }] };
   }
 
   try {

@@ -1,5 +1,7 @@
 let socket = null;
-let currentEndpoint = 'ws://localhost:3002';
+let currentEndpoint = 'ws://127.0.0.1:3002';
+let clientId = null;
+let clientLabel = '';
 let isConnected = false;
 let isEnabled = true;
 let reconnectTimer = null;
@@ -35,10 +37,18 @@ chrome.alarms.onAlarm.addListener((alarm) => {
   }
 });
 
-chrome.storage.local.get(['endpoint', 'enabled'], (result) => {
+chrome.storage.local.get(['endpoint', 'enabled', 'clientId', 'label'], (result) => {
   if (result.endpoint) {
     currentEndpoint = result.endpoint;
   }
+  // ponytail: migrate old localhost default to 127.0.0.1
+  if (currentEndpoint.includes('localhost')) {
+    currentEndpoint = currentEndpoint.replace('localhost', '127.0.0.1');
+    chrome.storage.local.set({ endpoint: currentEndpoint });
+  }
+  clientId = result.clientId || crypto.randomUUID();
+  clientLabel = result.label || '';
+  chrome.storage.local.set({ clientId, label: clientLabel });
   isEnabled = result.enabled !== false; // default ON
   if (isEnabled) {
     connect();
@@ -3584,17 +3594,18 @@ function connect() {
           throw new Error(`Unknown method: ${method}`);
       }
 
-      socket.send(JSON.stringify({ id, result }));
+      socket.send(JSON.stringify({ id, result, clientId }));
 
     } catch (error) {
       console.error('Command error:', error);
-      socket.send(JSON.stringify({ id, error: error.message }));
+      socket.send(JSON.stringify({ id, error: error.message, clientId }));
     }
   };
 
   socket.onopen = () => {
-    console.log('Connected to server');
+    console.log('Connected to server as', clientId, clientLabel);
     isConnected = true;
+    socket.send(JSON.stringify({ type: 'hello', clientId, label: clientLabel, version: '0.0.6' }));
     // Send ping every 20s to keep the WebSocket alive on both ends
     clearInterval(pingTimer);
     pingTimer = setInterval(() => {
@@ -3623,6 +3634,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'RECONNECT') {
     isEnabled = true;
     currentEndpoint = message.endpoint;
+    if (message.label !== undefined) {
+      clientLabel = message.label;
+      chrome.storage.local.set({ label: clientLabel });
+    }
     connect();
   }
   if (message.type === 'DISCONNECT') {
@@ -3638,7 +3653,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     isConnected = false;
   }
   if (message.type === 'GET_STATUS') {
-    sendResponse({ connected: isConnected });
+    sendResponse({ connected: isConnected, clientId, label: clientLabel, endpoint: currentEndpoint });
   }
   return true;
 });

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Opencode Brower",
-  "version": "0.0.6",
-  "version_name": "opencode-browser 0.0.6",
+  "version": "0.0.7",
+  "version_name": "opencode-browser 0.0.7",
   "description": "Opencode-browser peak =) by mytai20100",
   "permissions": [
     "tabs",

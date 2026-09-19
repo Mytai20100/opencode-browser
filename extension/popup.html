@@ -148,7 +148,7 @@
   <div class="header">
     <img src="icon.svg" alt="icon">
     <h3>Opencode Brower</h3>
-    <span class="version-badge">0.0.6</span>
+    <span class="version-badge">0.0.7</span>
   </div>
 
   <div class="status-row">
@@ -164,12 +164,16 @@
   </div>
 
   <div class="field">
+    <label>Profile label (e.g. work, personal)</label>
+    <input type="text" id="label" placeholder="work">
+  </div>
+  <div class="field">
     <label>Server Endpoint</label>
-    <input type="text" id="endpoint" placeholder="ws://localhost:3002" value="ws://localhost:3002">
+    <input type="text" id="endpoint" placeholder="ws://127.0.0.1:3002" value="ws://127.0.0.1:3002">
   </div>
   <button id="save-btn">Save Endpoint</button>
 
-  <div class="footer">opencode 0.0.6 &middot; <span id="ws-url">ws://localhost:3002</span></div>
+  <div class="footer">opencode 0.0.7 &middot; <span id="ws-url">ws://127.0.0.1:3002</span> &middot; id:<span id="client-id">?</span></div>
 
   <script src="popup.js"></script>
 </body>
