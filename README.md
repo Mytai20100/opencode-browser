@@ -83,8 +83,8 @@ Click the extension icon in the Chrome toolbar. The default endpoint is `ws://lo
 
 ### 5. Setup api & endpoint for Jev/Laya (Optional)
 ```env
-DECISION_ENDPOINT="https://yourprovider.com"
-DECISION_API_KEY="sk_prod_xyz123abc456..."
+DECISION_ENDPOINT="https://api.typesafe.ai/v1/systemone"
+DECISION_API_KEY="sk_xxxxxx"
 
 # Model Configuration
 DECISION_MODEL="jev-latest"
