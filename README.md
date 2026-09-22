@@ -1,7 +1,7 @@
 # opencode-browser
 
 [![npm version](https://img.shields.io/npm/v/@mytai20100/opencode-browser?label=mcp-server&color=blue)](https://www.npmjs.com/package/@mytai20100/opencode-browser)
-[![extension version](https://img.shields.io/badge/extension-0.0.7-blue)](https://github.com/mytai20100/opencode-browser)
+[![extension version](https://img.shields.io/badge/extension-0.0.8-blue)](https://github.com/mytai20100/opencode-browser)
 [![language](https://img.shields.io/badge/language-JavaScript-yellow)](https://github.com/mytai20100/opencode-browser)
 [![license](https://img.shields.io/badge/license-MIT-green)](./server/LICENSE)
 [![Package npm](https://github.com/Mytai20100/opencode-browser/actions/workflows/build.yml/badge.svg)](https://github.com/Mytai20100/opencode-browser/actions/workflows/build.yml)
@@ -44,7 +44,7 @@ Or run directly with npx (no install needed):
 npx @mytai20100/opencode-browser
 ```
 
-### 2. Register with OpenCode
+### 2. Register with OpenCode / claude code / codex
 
 Add the server to your OpenCode config (`~/.config/opencode/config.json` or `opencode.json` at project root):
 
@@ -61,6 +61,15 @@ Add the server to your OpenCode config (`~/.config/opencode/config.json` or `ope
 }
 ```
 
+Or 
+
+```bash
+claude mcp add opencode-browser npx @mytai20100/opencode-browser #Claude code
+
+opencode mcp add opencode-browser npx @mytai20100/opencode-browser #Opencode
+
+codex mcp add opencode-browser npx @mytai20100/opencode-browser #Codex
+```
 ### 3. Install the Chrome extension
 
 1. Download or clone this repository.
@@ -72,6 +81,15 @@ Add the server to your OpenCode config (`~/.config/opencode/config.json` or `ope
 
 Click the extension icon in the Chrome toolbar. The default endpoint is `ws://localhost:3002`. If the MCP server is running on a different machine or port, enter the correct address (e.g. `ws://192.168.1.62:3002`) and click **Save Endpoint**. The status indicator turns orange when connected.
 
+### 5. Setup api & endpoint for Jev/Laya (Optional)
+```env
+DECISION_ENDPOINT="https://yourprovider.com"
+DECISION_API_KEY="sk_prod_xyz123abc456..."
+
+# Model Configuration
+DECISION_MODEL="jev-latest"
+DECISION_TIMEOUT_MS=5000
+```
 ## Running locally from source
 
 If you want to run the MCP server from a local clone instead of installing from npm:
@@ -362,6 +380,7 @@ These tools require calling `chrome_debug_attach` first.
 | `chrome_get_workflow_context` | Snapshot of forms, buttons, inputs, and event log |
 | `chrome_get_tool_graph` | Get optimal tool execution plan for a given intent |
 | `chrome_list_clients` | Get list connected Chrome profiles (extension clients) |
+| `chrome_rank_candidates` | Get list decision from model "System One Model" same JEV / LAYA|
 
 ### CSS & Styling
 
@@ -615,7 +634,9 @@ Contributions are welcome.
 ## Changelog
 
 See [CHANGELOG-MCP.md](CHANGELOG-MCP.md) for a detailed list of changes.
-## v0.0.7
+### V0.0.8
+  - Try support "System-one" same Jev / Laya model for decision use tool.
+### v0.0.7
   - Fix multi-profile collision: client registry + routing, default 127.0.0.1 for extension . From [3DBarath](https://github.com/3DBarath)
 ### v0.0.6
 

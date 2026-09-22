@@ -1,4 +1,4 @@
-# V0.0.7
+# V0.0.8
 
 ### Initial Release
-  - Fix multi-profile collision: client registry + routing, default 127.0.0.1 for extension . From [3DBarath](https://github.com/3DBarath)
+  - Try support "System one model" same Jev / Laya model for decision use tool.
