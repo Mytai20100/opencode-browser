@@ -10,6 +10,81 @@ import { WebSocketServer, WebSocket } from "ws";
 const WS_PORT = parseInt(process.env.OPENCODE_BROWSER_PORT || "3002", 10);
 const WS_HOST = process.env.OPENCODE_BROWSER_HOST || "0.0.0.0";
 
+// System-one decision model endpoint (Jev/TypeSafe API shape: POST {endpoint}
+// with {model, state, questions} -> {model, answers, usage}). Works with any
+// provider exposing this same contract, e.g. https://api.typesafe.ai/v1/systemone
+// or a self-hosted Laya instance at http://127.0.0.1:8008/v1/systemone.
+const DECISION_ENDPOINT = process.env.DECISION_ENDPOINT || "";
+const DECISION_API_KEY = process.env.DECISION_API_KEY || "";
+const DECISION_MODEL = process.env.DECISION_MODEL || "jev-latest";
+const DECISION_TIMEOUT_MS = parseInt(process.env.DECISION_TIMEOUT_MS || "5000", 10);
+const DECISION_CONFIGURED = Boolean(DECISION_ENDPOINT && DECISION_API_KEY);
+
+interface SystemOneQuestion {
+  type: "choice" | "score" | "noul";
+  instructions: string;
+  criteria?: Record<string, string> | string[];
+}
+
+interface SystemOneAnswer {
+  type: "choice" | "score" | "noul";
+  choice?: string;
+  score?: number;
+  noul?: number;
+  probabilities?: Record<string, number>;
+  confidence?: number;
+}
+
+interface SystemOneResponse {
+  model: string;
+  answers: Record<string, SystemOneAnswer>;
+  usage?: { input_tokens: number; output_tokens: number };
+}
+
+async function callSystemOne(
+  state: string | Record<string, unknown> | unknown[],
+  questions: Record<string, SystemOneQuestion>
+): Promise<{ response: SystemOneResponse; latency_ms: number }> {
+  if (!DECISION_ENDPOINT) {
+    throw new Error(
+      "DECISION_ENDPOINT is not set. Point it at a system-one decision endpoint " +
+      "(e.g. DECISION_ENDPOINT=https://api.typesafe.ai/v1/systemone or " +
+      "DECISION_ENDPOINT=http://127.0.0.1:8008/v1/systemone) to use chrome_rank_candidates."
+    );
+  }
+
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (DECISION_API_KEY) headers["Authorization"] = `Bearer ${DECISION_API_KEY}`;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DECISION_TIMEOUT_MS);
+
+  const t0 = Date.now();
+  try {
+    const res = await fetch(DECISION_ENDPOINT, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ model: DECISION_MODEL, state, questions }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`System-one endpoint returned ${res.status}: ${text.slice(0, 200)}`);
+    }
+
+    const data = (await res.json()) as SystemOneResponse;
+    return { response: data, latency_ms: Date.now() - t0 };
+  } catch (err: any) {
+    clearTimeout(timer);
+    if (err.name === "AbortError") {
+      throw new Error(`System-one endpoint timed out after ${DECISION_TIMEOUT_MS}ms (${DECISION_ENDPOINT}). Is it running?`);
+    }
+    throw new Error(`Failed to reach system-one endpoint (${DECISION_ENDPOINT}): ${err.message}`);
+  }
+}
+
 const wss = new WebSocketServer({
   port: WS_PORT,
   host: WS_HOST,
@@ -126,7 +201,7 @@ const heartbeat = setInterval(() => {
 const server = new Server(
   {
     name: "opencode-browser",
-    version: "opencode beta-2a",
+    version: "opencode 0.0.8",
   },
   {
     capabilities: {
@@ -1295,6 +1370,40 @@ const TOOLS = [
     },
   },
 
+  {
+    name: "chrome_rank_candidates",
+    description:
+      "Rank a short list of candidates (buttons, links, form fields, network requests, text " +
+      "matches, etc.) against a plain-text intent, using a fast system-one decision model " +
+      "(Jev/TypeSafe API shape) instead of reading them yourself. Use this AFTER " +
+      "chrome_get_workflow_context, chrome_find_elements, chrome_debug_get_network, or " +
+      "chrome_find_text_on_screen return multiple ambiguous matches and you need to pick the " +
+      "one that best fits the intent. Returns the best candidate plus a confidence score in a " +
+      "single fast call. Requires DECISION_ENDPOINT to be configured on the server; if it isn't, " +
+      "this tool returns a clear error.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        intent: {
+          type: "string",
+          description: "Plain-text description of what you're looking for, e.g. 'the submit order button' or 'a request that returned an error'",
+        },
+        candidates: {
+          type: "array",
+          description:
+            "List of candidates to choose from, each as a short label/description string " +
+            "(e.g. element text, a selector plus context, or a request URL). Keep each entry " +
+            "concise — long entries eat into the model's context budget and hurt accuracy.",
+          items: { type: "string" },
+        },
+        top_k: {
+          type: "number",
+          description: "Return this many top candidates ranked by probability instead of just the best one (default 1)",
+        },
+      },
+      required: ["intent", "candidates"],
+    },
+  },
   {
     name: "chrome_double_click",
     description: "Double click an element by CSS selector or at specific coordinates",
@@ -2771,7 +2880,10 @@ const TOOL_GRAPH: Record<string, {
 };
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return { tools: TOOLS };
+  const tools = DECISION_CONFIGURED
+    ? TOOLS
+    : TOOLS.filter((t) => t.name !== "chrome_rank_candidates");
+  return { tools };
 });
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
@@ -2840,6 +2952,80 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   // Client list: handled server-side, no extension needed
   if (name === "chrome_list_clients") {
     return { content: [{ type: "text", text: JSON.stringify(listClients(), null, 2) }] };
+  }
+
+  // System-one candidate ranking: handled server-side, no extension needed
+  if (name === "chrome_rank_candidates") {
+    if (!DECISION_CONFIGURED) {
+      return {
+        content: [{
+          type: "text",
+          text: "Error: chrome_rank_candidates is disabled. Set DECISION_ENDPOINT and " +
+                "DECISION_API_KEY in the server environment to enable it.",
+        }],
+        isError: true,
+      };
+    }
+
+    const intent = (args?.intent as string) || "";
+    const candidates = (args?.candidates as string[]) || [];
+    const topK = (args?.top_k as number) || 1;
+
+    if (!intent) {
+      return { content: [{ type: "text", text: "Error: intent is required" }], isError: true };
+    }
+    if (!candidates.length) {
+      return { content: [{ type: "text", text: "Error: candidates array is empty" }], isError: true };
+    }
+    if (candidates.length > 50) {
+      return {
+        content: [{
+          type: "text",
+          text: `Error: ${candidates.length} candidates exceeds the practical limit (~50). ` +
+                `Filter the list down first, or split into batches.`,
+        }],
+        isError: true,
+      };
+    }
+
+    const criteria: Record<string, string> = {};
+    candidates.forEach((c, i) => { criteria[`c${i}`] = c; });
+
+    try {
+      const { response, latency_ms } = await callSystemOne(intent, {
+        best_match: {
+          type: "choice",
+          instructions: intent,
+          criteria,
+        },
+      });
+
+      const answer = response.answers?.best_match || {};
+      const probs: Record<string, number> = answer.probabilities || {};
+
+      const ranked = Object.entries(probs)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, topK)
+        .map(([key, prob]) => ({
+          candidate: criteria[key],
+          index: parseInt(key.slice(1), 10),
+          probability: prob,
+        }));
+
+      const output = {
+        intent,
+        model: response.model,
+        best: ranked[0] || null,
+        ranked: topK > 1 ? ranked : undefined,
+        confidence: answer.confidence,
+        usage: response.usage,
+        latency_ms,
+      };
+
+      return { content: [{ type: "text", text: JSON.stringify(output, null, 2) }] };
+    } catch (err: any) {
+      return { content: [{ type: "text", text: `Error: ${err.message}` }], isError: true };
+    }
   }
 
   try {
